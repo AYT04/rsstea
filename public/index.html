@@ -1,381 +1,26 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <title>rssTea - RSS Reader</title>
-  <meta name="description" content="rssTea is a fast, lightweight RSS and podcast Web Viewer that can be hosted On Github Pages."/>
-  <link rel="shortcut icon" href="favicon.ico">
+<!DOCTYPE html><html><head>
+    <title>AYT04 - RSS Reader Web App Hosted</title>
+    <meta name="description" content="This fork rssTea by AYT04 is a fast, lightweight RSS and podcast Web Viewer that can be hosted anywhere in the Cloud."/>
+    <link rel="shortcut icon" href="favicon.ico"> 
   <link rel="icon" href="favicon.png">
-  <link rel="manifest" href="manifest.json" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="rdx" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
-  <meta charset="utf-8">
-
-  <!-- Optional: keep theme.css if you already use it, but we'll also style here to change the look. -->
-  <link rel="stylesheet" href="theme.css" type="text/css">
-
-  <style>
-    :root{
-      --bg: #0b1220;
-      --panel: rgba(255,255,255,.06);
-      --panel-2: rgba(255,255,255,.08);
-      --text: #e7eefc;
-      --muted: rgba(231,238,252,.72);
-      --border: rgba(231,238,252,.12);
-      --shadow: 0 16px 60px rgba(0,0,0,.35);
-
-      --accent: #1d9bf0;  /* Twitter-ish */
-      --accent-2: #7c4dff; /* Bluesky-ish vibe */
-      --good: #2ecc71;
-      --warn: #ffcc66;
-      --danger: #ff5c7a;
-
-      --radius: 16px;
-      --radius-sm: 12px;
-
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-    }
-
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    body{
-      margin:0;
-      font-family: var(--sans);
-      background:
-        radial-gradient(1200px 600px at 10% -10%, rgba(29,155,240,.35), transparent 60%),
-        radial-gradient(900px 520px at 90% 0%, rgba(124,77,255,.28), transparent 55%),
-        radial-gradient(800px 500px at 50% 100%, rgba(29,155,240,.18), transparent 60%),
-        var(--bg);
-      color: var(--text);
-      overflow-x: hidden;
-    }
-
-    /* Re-skin existing IDs/classes without touching your JS variables */
-    #header{
-      position: sticky;
-      top: 0;
-      z-index: 30;
-      height: 56px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-weight: 800;
-      letter-spacing: .3px;
-
-      background: linear-gradient(to bottom, rgba(11,18,32,.9), rgba(11,18,32,.55));
-      border-bottom: 1px solid var(--border);
-
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-
-    #header::before{
-      content:"";
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      margin-right: 10px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      box-shadow: 0 0 0 4px rgba(29,155,240,.12);
-      flex: 0 0 auto;
-    }
-
-    #pcwrap{
-      width: min(1120px, 100%);
-      margin: 18px auto 40px;
-      padding: 0 14px;
-      display:flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    #filter{
-      display:flex;
-      align-items:center;
-      justify-content: space-between;
-      gap: 12px;
-
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 12px 14px;
-      box-shadow: var(--shadow);
-    }
-
-    .pclogo{
-      font-weight: 850;
-      letter-spacing: .2px;
-      opacity: .95;
-      display:flex;
-      align-items:center;
-      gap: 10px;
-    }
-
-    .pclogo::after{
-      content:"";
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      box-shadow: 0 0 0 4px rgba(124,77,255,.12);
-      display:inline-block;
-    }
-
-    #filters{
-      display:flex;
-      align-items:center;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-
-    .tab{
-      cursor:pointer;
-      user-select:none;
-      padding: 8px 12px;
-      border-radius: 999px;
-      border: 1px solid rgba(231,238,252,.08);
-      background: rgba(255,255,255,.03);
-      color: var(--muted);
-      font-weight: 650;
-      font-size: 13px;
-      transition: transform .08s ease, background .15s ease, border-color .15s ease, color .15s ease;
-    }
-    .tab:hover{
-      transform: translateY(-1px);
-      border-color: rgba(29,155,240,.35);
-      color: rgba(231,238,252,.92);
-      background: rgba(29,155,240,.08);
-    }
-    .tab.active{
-      color: #06111f;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      border-color: rgba(255,255,255,.0);
-      box-shadow: 0 10px 24px rgba(29,155,240,.18);
-    }
-
-    /* your JS toggles this class on select */
-    select[name="changechannel"]{
-      appearance: none;
-      -webkit-appearance: none;
-      -moz-appearance: none;
-
-      padding: 10px 38px 10px 12px;
-      border-radius: 999px;
-      border: 1px solid rgba(231,238,252,.12);
-      background: rgba(255,255,255,.03);
-      color: rgba(231,238,252,.92);
-      font-weight: 650;
-      outline: none;
-      cursor: pointer;
-      background-image:
-        linear-gradient(45deg, transparent 50%, rgba(231,238,252,.8) 50%),
-        linear-gradient(135deg, rgba(231,238,252,.8) 50%, transparent 50%),
-        linear-gradient(to right, transparent, transparent);
-      background-position:
-        calc(100% - 18px) calc(50% - 3px),
-        calc(100% - 12px) calc(50% - 3px),
-        calc(100% - 2.5em) 0.5em;
-      background-size:
-        6px 6px,
-        6px 6px,
-        1px 1.5em;
-      background-repeat: no-repeat;
-    }
-    select[name="changechannel"].selected{
-      border-color: rgba(29,155,240,.45);
-      box-shadow: 0 0 0 4px rgba(29,155,240,.12);
-    }
-
-    #wrap{
-      /* keep your existing “posts here” container behavior */
-      display:block;
-    }
-
-    /* Floating player re-skin */
-    #floating_player{
-      position: fixed;
-      left: 50%;
-      bottom: 18px;
-      transform: translateX(-50%);
-      width: min(720px, calc(100% - 20px));
-
-      display:none; /* your JS sets display='block' */
-      opacity: 0;
-      transition: opacity .18s ease, transform .18s ease;
-      z-index: 50;
-      pointer-events: none;
-    }
-    #floating_player.show{
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-      pointer-events: auto;
-    }
-
-    /* your JS adds class "show" to fp after display block */
-    #floating_player.show #timeline_wrap,
-    #floating_player.show .player_meta{
-      transform: translateY(0);
-      opacity: 1;
-    }
-
-    .player_meta{
-      display:flex;
-      align-items:center;
-      justify-content: space-between;
-      gap: 12px;
-
-      background: linear-gradient(135deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
-      border: 1px solid rgba(231,238,252,.14);
-      border-radius: var(--radius);
-
-      padding: 12px 12px;
-      margin: 0;
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-
-      transform: translateY(10px);
-      opacity: .88;
-      transition: transform .18s ease, opacity .18s ease;
-    }
-
-    .player_meta > button{
-      cursor:pointer;
-      border: 1px solid rgba(231,238,252,.12);
-      background: rgba(255,255,255,.04);
-      color: rgba(231,238,252,.95);
-      border-radius: 999px;
-      padding: 9px 12px;
-      font-weight: 750;
-      transition: transform .08s ease, border-color .15s ease, background .15s ease;
-    }
-    .player_meta > button:hover{
-      transform: translateY(-1px);
-      border-color: rgba(29,155,240,.35);
-      background: rgba(29,155,240,.08);
-    }
-
-    #playpausebutton.playing{
-      border-color: rgba(29,155,240,.55);
-      box-shadow: 0 0 0 4px rgba(29,155,240,.12);
-    }
-
-    /* title styling */
-    #title{
-      flex: 1 1 auto;
-      text-align: center;
-      font-weight: 850;
-      letter-spacing: .2px;
-      color: rgba(231,238,252,.96);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      padding: 0 8px;
-    }
-
-    #speed, #plus30{
-      flex: 0 0 auto;
-    }
-
-    #timeline_wrap{
-      margin-top: 10px;
-      background: rgba(255,255,255,.03);
-      border: 1px solid rgba(231,238,252,.12);
-      border-radius: var(--radius);
-      padding: 10px 12px 12px;
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-
-      transform: translateY(10px);
-      opacity: .88;
-      transition: transform .18s ease, opacity .18s ease;
-    }
-
-    #timeline{
-      display:flex;
-      align-items:center;
-      gap: 10px;
-    }
-
-    #seekbar{
-      width: 100%;
-      accent-color: var(--accent); /* modern browsers */
-      cursor: pointer;
-    }
-
-    #current_time, #duration{
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--muted);
-      white-space: nowrap;
-    }
-
-    ul#chapters{
-      margin: 4px 0 8px;
-      padding: 0;
-      list-style: none;
-      display:flex;
-      flex-direction: row;
-      gap: 6px;
-      flex-wrap: wrap;
-      min-height: 22px;
-    }
-
-    ul#chapters li{
-      font-size: 12px;
-      color: var(--muted);
-      border: 1px solid rgba(231,238,252,.12);
-      background: rgba(255,255,255,.03);
-      padding: 4px 8px;
-      border-radius: 999px;
-    }
-
-    /* Optional: small nowplaying emphasis if you already use .post.nowplaying */
-    .post.nowplaying{
-      outline: 2px solid rgba(29,155,240,.35);
-      box-shadow: 0 12px 40px rgba(29,155,240,.12);
-      border-radius: 14px;
-    }
-
-    /* Layout helper */
-    @media (max-width: 720px){
-      #filter{
-        flex-direction: column;
-        align-items: stretch;
-      }
-      #filters{
-        justify-content: flex-start;
-      }
-      .player_meta{
-        flex-wrap: wrap;
-        justify-content: center;
-      }
-      #title{
-        order: 3;
-        flex: 1 1 100%;
-      }
-    }
-  </style>
+<link rel="manifest" href="manifest.json" />
+ <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="rdx" />
+    <meta   name="apple-mobile-web-app-status-bar-style" content="default" />
+     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="theme.css" type="text/css">
 </head>
-
 <body>
-  <div id="header">rssTea</div>
-
-  <div id="pcwrap">
-    <div id="filter">
-      <div class="pclogo">rssTea</div>
-      <span id="filters">
-        <span class="tab active">All</span>
-        <span class="tab">Posts</span>
-        <span class="tab">Podcasts</span>
-        <select name="changechannel"><option value="All">All Channels</option><option value="SomeOrdinaryGamers on Odysee">SomeOrdinaryGamers on Odysee</option><option value="Brodie Robertson | Linux Tips & Tricks on Odysee">Brodie Robertson | Linux Tips & Tricks on Odysee</option><option value="Cyb3rMaddy">Cyb3rMaddy</option><option value="Techlore">Techlore</option><option value="Oh That Reminds Me">Oh That Reminds Me</option></select>
-      </span>
-    </div>
-
-    <div id="wrap">
-      <div class="post" data-channel="SomeOrdinaryGamers on Odysee" data-ts="1786234161" data-audio="0"><div class="leftpan"><img src="https://thumbnails.lbry.com/WX3Xw7bq6Hc" alt="Be Careful What You Post Now..."/ ></div><div class="rightpan"><div class="feedname"><span class="channel">SomeOrdinaryGamers on Odysee</span> &bull; <span class="date">Aug 09, 2026</span></div>
+<div id="header">AYT04</div>
+    <div id="pcwrap">
+<div id="filter"><div class="pclogo">AYT04</div><span id="filters">
+<span class="tab active">All</span>
+<span class="tab">Posts</span>
+<span class="tab">Podcasts</span>
+<select name="changechannel"><option value="All">All Channels</option><option value="SomeOrdinaryGamers on Odysee">SomeOrdinaryGamers on Odysee</option><option value="Brodie Robertson | Linux Tips & Tricks on Odysee">Brodie Robertson | Linux Tips & Tricks on Odysee</option><option value="Cyb3rMaddy">Cyb3rMaddy</option><option value="Techlore">Techlore</option><option value="Oh That Reminds Me">Oh That Reminds Me</option></select></span></div>
+<div id="wrap">
+<div class="post" data-channel="SomeOrdinaryGamers on Odysee" data-ts="1786234161" data-audio="0"><div class="leftpan"><img src="https://thumbnails.lbry.com/WX3Xw7bq6Hc" alt="Be Careful What You Post Now..."/ ></div><div class="rightpan"><div class="feedname"><span class="channel">SomeOrdinaryGamers on Odysee</span> &bull; <span class="date">Aug 09, 2026</span></div>
 <h2><a href="https://odysee.com/be-careful-what-you-post-now...:a030afff21e416111b85f9f7cbbd012ba8e92ce5" target="_blank">Be Careful What You Post Now...</a></h2>
 </div></div>
 <div class="post" data-channel="Brodie Robertson | Linux Tips & Tricks on Odysee" data-ts="1786210224" data-audio="0"><div class="leftpan"><img src="https://thumbnails.lbry.com/B-mooy15JzQ" alt="Behind The Fedora Linux Sausage"/ ></div><div class="rightpan"><div class="feedname"><span class="channel">Brodie Robertson | Linux Tips & Tricks on Odysee</span> &bull; <span class="date">Aug 08, 2026</span></div>
@@ -461,39 +106,64 @@
 <audio src="https://mcdn.podbean.com/mf/web/62ahv4mstzp88kvn/Ep121.mp3" preload="metadata" aid="4"  controls></audio></div>
 </div></div>
 
+</div>
     </div>
+<div id="floating_player">
+<div class="player_meta"><button id="playpausebutton">Play</button><span id="title">Not Playing</span> <button id="speed">1x</button><button id="plus30">+30s</button></div>
+  <div id="timeline_wrap">
+  <ul id="chapters"></ul>
+    <span id="current_time"></span>
+    <span id="timeline">
+<input type="range" id="seekbar" min="0" max="100" step="0.1">
+</span>
+    <span id="duration"></span>
   </div>
+</div>
 
-  <div id="floating_player">
-    <div class="player_meta">
-      <button id="playpausebutton">Play</button>
-      <span id="title">Not Playing</span>
-      <button id="speed">1x</button>
-      <button id="plus30">+30s</button>
-    </div>
-    <div id="timeline_wrap">
-      <ul id="chapters"></ul>
-      <span id="current_time"></span>
-      <span id="timeline">
-        <input type="range" id="seekbar" min="0" max="100" step="0.1">
-      </span>
-      <span id="duration"></span>
-    </div>
-  </div>
+<script>
+const tabs = document.querySelectorAll('.tab');
+const posts = document.querySelectorAll('.post');
+const select = document.querySelector('select[name="changechannel"]');
+let selectedChannel = 'All';
 
-  <script>
-    const tabs = document.querySelectorAll('.tab');
-    const posts = document.querySelectorAll('.post');
-    const select = document.querySelector('select[name="changechannel"]');
-    let selectedChannel = 'All';
-
-    select.addEventListener('change', () =>
+select.addEventListener('change', () =>
+{
+    selectedChannel = select.value;
+    posts.forEach(post =>
     {
-        selectedChannel = select.value;
+        const channel = post.getAttribute('data-channel');
+        if (selectedChannel === 'All' || channel === selectedChannel)
+        {
+            post.style.display = 'block';
+        }
+        else
+        {
+            post.style.display = 'none';
+        }
+    });
+    tabs.forEach(tab =>
+    {
+        tab.classList.remove('active');
+        select.classList.add('selected');
+    });
+
+});
+
+tabs.forEach(tab =>
+{
+    tab.addEventListener('click', () =>
+    {
+        tabs.forEach(tab =>
+        {
+            tab.classList.remove('active');
+        });
+        tab.classList.add('active');
+        const filter = tab.textContent.trim();
         posts.forEach(post =>
         {
+            const audio = parseInt(post.getAttribute('data-audio'));
             const channel = post.getAttribute('data-channel');
-            if (selectedChannel === 'All' || channel === selectedChannel)
+            if (filter === 'All' || (filter === 'Posts' && audio === 0) || (filter === 'Podcasts' && audio === 1))
             {
                 post.style.display = 'block';
             }
@@ -502,321 +172,318 @@
                 post.style.display = 'none';
             }
         });
-        tabs.forEach(tab =>
-        {
-            tab.classList.remove('active');
-            select.classList.add('selected');
-        });
 
+        select.value = 'All';
+        select.classList.remove('selected');
+    });
+});
+
+
+document.addEventListener('DOMContentLoaded', function ()
+{
+    const btns = document.querySelectorAll('.audio button[data-aid]');
+    let caudio = null;
+    let ppBtn = null;
+    const fpBtn = document.querySelector('#floating_player #playpausebutton');
+    const tl = document.querySelector('#timeline');
+    const fsb = document.querySelector('#seekbar');
+
+    fpBtn.addEventListener('click', function ()
+    {
+        togglePP();
     });
 
-    tabs.forEach(tab =>
+    function togglePP()
     {
-        tab.addEventListener('click', () =>
+        if (caudio && caudio.paused)
         {
-            tabs.forEach(tab =>
-            {
-                tab.classList.remove('active');
-            });
-            tab.classList.add('active');
-            const filter = tab.textContent.trim();
-            posts.forEach(post =>
-            {
-                const audio = parseInt(post.getAttribute('data-audio'));
-                const channel = post.getAttribute('data-channel');
-                if (filter === 'All' || (filter === 'Posts' && audio === 0) || (filter === 'Podcasts' && audio === 1))
-                {
-                    post.style.display = 'block';
-                }
-                else
-                {
-                    post.style.display = 'none';
-                }
-            });
+            caudio.play();
+        }
+        else if (caudio)
+        {
+            caudio.pause();
+        }
+    }
 
-            select.value = 'All';
-            select.classList.remove('selected');
+    tl.addEventListener('input', function (e)
+    {
+        const seekPercentage = fsb.value;
+        const seekTime = (seekPercentage / 100) * caudio.duration;
+        caudio.currentTime = seekTime;
+    });
+
+    const speeds = [1, 1.2, 1.5, 1.75, 2];
+    let currentSpeedIndex = 0;
+    document.getElementById('speed').addEventListener('click', () =>
+    {
+        currentSpeedIndex = (currentSpeedIndex + 1) % speeds.length;
+        const speed = speeds[currentSpeedIndex];
+        caudio.playbackRate = speed;
+        document.getElementById('speed').innerText = speed + 'x';
+        updatePositionState();
+    });
+    document.getElementById('plus30').addEventListener('click', () =>
+    {
+        caudio.currentTime += 30;
+    });
+
+    function updateAudioTime()
+    {
+        const currentTime = caudio.currentTime;
+        const formattedCurrentTime = formatTime(currentTime);
+        const formattedDuration = formatTime(caudio.duration);
+
+        document.getElementById('current_time').textContent = formattedCurrentTime;
+        document.getElementById('duration').textContent = formattedDuration;
+        const progress = (currentTime / caudio.duration) * 100;
+        fsb.value = progress;
+    }
+
+    function playTime()
+    {
+        navigator.mediaSession.playbackState = 'playing';
+        fpBtn.classList.toggle('playing');
+        ppBtn.classList.toggle('playing');
+        updatePositionState();
+    }
+
+    function pauseTime()
+    {
+        navigator.mediaSession.playbackState = 'paused';
+        fpBtn.classList.toggle('playing');
+        ppBtn.classList.toggle('playing');
+        updatePositionState();
+    }
+
+
+    function formatTime(time)
+    {
+        const minutes = Math.floor(time / 60);
+        const seconds = Math.floor(time % 60);
+        return ('0' + minutes).slice(-2) + ':' + ('0' + seconds).slice(-2);
+    }
+
+    btns.forEach(function (btn)
+    {
+        btn.addEventListener('click', function ()
+        {
+            const aid = this.getAttribute('data-aid');
+            const audioElem = document.querySelector('audio[aid="' + aid + '"]');
+            changePlayback(audioElem);
         });
     });
 
-
-    document.addEventListener('DOMContentLoaded', function ()
+    function changePlayback(audioElem)
     {
-        const btns = document.querySelectorAll('.audio button[data-aid]');
-        let caudio = null;
-        let ppBtn = null;
-        const fpBtn = document.querySelector('#floating_player #playpausebutton');
-        const tl = document.querySelector('#timeline');
-        const fsb = document.querySelector('#seekbar');
+        const prevPPBtn = ppBtn;
+        ppBtn = document.querySelector('[data-aid="' + audioElem.getAttribute('aid') + '"]');
+        const src = audioElem.getAttribute('src');
 
-        fpBtn.addEventListener('click', function ()
+        if (caudio && caudio !== audioElem)
         {
-            togglePP();
-        });
+            caudio.pause();
+            caudio.removeEventListener('timeupdate', updateAudioTime);
+            caudio.removeEventListener('play', playTime);
+            caudio.removeEventListener('pause', pauseTime);
 
-        function togglePP()
-        {
-            if (caudio && caudio.paused)
+            prevPPBtn.classList.remove('playing');
+            fpBtn.classList.remove('playing');
+            fsb.value = '0';
+
+            if (audioElem.readyState >= 1)
             {
-                caudio.play();
-            }
-            else if (caudio)
-            {
-                caudio.pause();
-            }
-        }
-
-        tl.addEventListener('input', function (e)
-        {
-            const seekPercentage = fsb.value;
-            const seekTime = (seekPercentage / 100) * caudio.duration;
-            caudio.currentTime = seekTime;
-        });
-
-        const speeds = [1, 1.2, 1.5, 1.75, 2];
-        let currentSpeedIndex = 0;
-        document.getElementById('speed').addEventListener('click', () =>
-        {
-            currentSpeedIndex = (currentSpeedIndex + 1) % speeds.length;
-            const speed = speeds[currentSpeedIndex];
-            caudio.playbackRate = speed;
-            document.getElementById('speed').innerText = speed + 'x';
-            updatePositionState();
-        });
-        document.getElementById('plus30').addEventListener('click', () =>
-        {
-            caudio.currentTime += 30;
-        });
-
-        function updateAudioTime()
-        {
-            const currentTime = caudio.currentTime;
-            const formattedCurrentTime = formatTime(currentTime);
-            const formattedDuration = formatTime(caudio.duration);
-
-            document.getElementById('current_time').textContent = formattedCurrentTime;
-            document.getElementById('duration').textContent = formattedDuration;
-            const progress = (currentTime / caudio.duration) * 100;
-            fsb.value = progress;
-        }
-
-        function playTime()
-        {
-            navigator.mediaSession.playbackState = 'playing';
-            fpBtn.classList.toggle('playing');
-            ppBtn.classList.toggle('playing');
-            updatePositionState();
-        }
-
-        function pauseTime()
-        {
-            navigator.mediaSession.playbackState = 'paused';
-            fpBtn.classList.toggle('playing');
-            ppBtn.classList.toggle('playing');
-            updatePositionState();
-        }
-
-
-        function formatTime(time)
-        {
-            const minutes = Math.floor(time / 60);
-            const seconds = Math.floor(time % 60);
-            return ('0' + minutes).slice(-2) + ':' + ('0' + seconds).slice(-2);
-        }
-
-        btns.forEach(function (btn)
-        {
-            btn.addEventListener('click', function ()
-            {
-                const aid = this.getAttribute('data-aid');
-                const audioElem = document.querySelector('audio[aid="' + aid + '"]');
-                changePlayback(audioElem);
-            });
-        });
-
-        function changePlayback(audioElem)
-        {
-            const prevPPBtn = ppBtn;
-            ppBtn = document.querySelector('[data-aid="' + audioElem.getAttribute('aid') + '"]');
-            const src = audioElem.getAttribute('src');
-
-            if (caudio && caudio !== audioElem)
-            {
-                caudio.pause();
-                caudio.removeEventListener('timeupdate', updateAudioTime);
-                caudio.removeEventListener('play', playTime);
-                caudio.removeEventListener('pause', pauseTime);
-
-                prevPPBtn.classList.remove('playing');
-                fpBtn.classList.remove('playing');
-                fsb.value = '0';
-
-                if (audioElem.readyState >= 1)
-                {
-                    startPlayback(audioElem);
-                }
-                else
-                {
-                    audioElem.addEventListener('loadedmetadata', function ()
-                    {
-                        startPlayback(audioElem);
-                    });
-                }
-            }
-            else if (caudio)
-            {
-                togglePP();
+                startPlayback(audioElem);
             }
             else
             {
-                if (audioElem.readyState >= 1)
+                audioElem.addEventListener('loadedmetadata', function ()
                 {
                     startPlayback(audioElem);
-                }
-                else
-                {
-                    audioElem.addEventListener('loadedmetadata', function ()
-                    {
-                        startPlayback(audioElem);
-                    });
-                }
+                });
             }
         }
-
-        function updatePositionState()
+        else if (caudio)
         {
-            navigator.mediaSession.setPositionState(
-            {
-                duration: caudio.duration,
-                playbackRate: caudio.playbackRate,
-                position: caudio.currentTime,
-            });
+            togglePP();
         }
-
-        function startPlayback(audioElem)
+        else
         {
-
-            const fp = document.querySelector('#floating_player');
-            const closestPost = audioElem.closest('.post');
-            document.querySelectorAll('.post.nowplaying').forEach(e => e.classList.remove('nowplaying'));
-            closestPost.classList.add('nowplaying');
-            const h2text = closestPost.querySelector('h2').textContent;
-            document.getElementById('title').innerHTML = h2text;
-            caudio = audioElem;
-            caudio.addEventListener('timeupdate', updateAudioTime);
-            caudio.addEventListener('play', playTime);
-            caudio.addEventListener('pause', pauseTime);
-            const audioDur = caudio.duration;
-            const formattedDur = formatTime(audioDur);
-            document.getElementById('duration').textContent = formattedDur;
-            fp.style.display = 'block';
-            setTimeout(function ()
+            if (audioElem.readyState >= 1)
             {
-                fp.classList.add("show");
-            }, 10);
-            caudio.play();
-
-            document.getElementById('speed').innerText = caudio.playbackRate + 'x';
-            const mediaAlbumArt = 'https://images1-focus-opensocial.googleusercontent.com/gadgets/proxy?url=' + encodeURIComponent(closestPost.querySelector('img').src) + '&container=ig';
-            navigator.mediaSession.metadata = new MediaMetadata(
-            {
-                title: h2text,
-                artist: closestPost.querySelector('.channel').textContent,
-                album: "rssTea",
-                artwork: [
-            {
-                    src: closestPost.querySelector('img').src,
-            }, ],
-            });
-
-
-            const totalAids = document.querySelectorAll('[data-aid]').length;
-            let nextAid = Math.floor(audioElem.getAttribute('aid')) + 1;
-            let prevAid = Math.floor(audioElem.getAttribute('aid')) - 1;
-            if (nextAid > totalAids - 1)
-            {
-                nextAid = 0;
+                startPlayback(audioElem);
             }
-            if (prevAid < 0)
+            else
             {
-                prevAid = totalAids - 1;
+                audioElem.addEventListener('loadedmetadata', function ()
+                {
+                    startPlayback(audioElem);
+                });
             }
-
-            navigator.mediaSession.setActionHandler("play", () =>
-            {
-                caudio.play();
-            });
-            navigator.mediaSession.setActionHandler("pause", () =>
-            {
-                caudio.pause();
-            });
-
-            navigator.mediaSession.setActionHandler(
-                'nexttrack',
-                () =>
-                {
-                    changePlayback(document.querySelector("[aid=\"" + nextAid + "\"]"));
-                }
-            );
-            navigator.mediaSession.setActionHandler(
-                'previoustrack',
-                () =>
-                {
-                    changePlayback(document.querySelector("[aid=\"" + prevAid + "\"]"));
-                }
-            );
-            navigator.mediaSession.setActionHandler('seekbackward', (details) =>
-            {
-                caudio.currentTime = caudio.currentTime - (details.seekOffset || 10);
-                updatePositionState();
-            });
-            navigator.mediaSession.setActionHandler('seekforward', (details) =>
-            {
-                caudio.currentTime = caudio.currentTime + (details.seekOffset || 10);
-                updatePositionState();
-            });
-
         }
+    }
 
-
-    });
-
-
-    const deviceWidth = screen.width;
-    const deviceHeight = screen.height;
-    const pixelRatio = window.devicePixelRatio || 1;
-
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-
-    canvas.width = deviceWidth * pixelRatio;
-    canvas.height = deviceHeight * pixelRatio;
-
-    ctx.fillStyle = 'white';
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    function updatePositionState()
     {
-        ctx.fillStyle = 'black';
+        navigator.mediaSession.setPositionState(
+        {
+            duration: caudio.duration,
+            playbackRate: caudio.playbackRate,
+            position: caudio.currentTime,
+        });
+    }
+
+    function startPlayback(audioElem)
+    {
+
+        const fp = document.querySelector('#floating_player');
+        const closestPost = audioElem.closest('.post');
+        document.querySelectorAll('.post.nowplaying').forEach(e => e.classList.remove('nowplaying'));
+        closestPost.classList.add('nowplaying');
+        const h2text = closestPost.querySelector('h2').textContent;
+        document.getElementById('title').innerHTML = h2text;
+        caudio = audioElem;
+        caudio.addEventListener('timeupdate', updateAudioTime);
+        caudio.addEventListener('play', playTime);
+        caudio.addEventListener('pause', pauseTime);
+        const audioDur = caudio.duration;
+        const formattedDur = formatTime(audioDur);
+        document.getElementById('duration').textContent = formattedDur;
+        fp.style.display = 'block';
+        setTimeout(function ()
+        {
+            fp.classList.add("show");
+        }, 10);
+        caudio.play();
+
+        document.getElementById('speed').innerText = caudio.playbackRate + 'x';
+        const mediaAlbumArt = 'https://images1-focus-opensocial.googleusercontent.com/gadgets/proxy?url=' + encodeURIComponent(closestPost.querySelector('img').src) + '&container=ig';
+        navigator.mediaSession.metadata = new MediaMetadata(
+        {
+            title: h2text,
+            artist: closestPost.querySelector('.channel').textContent,
+            album: "rssTea",
+            artwork: [
+        //    {
+        //        src: mediaAlbumArt + '&resize_w=128&resize_h=128',
+        //        sizes: "128x128",
+        //        type: "image/png",
+        //    },
+        //    {
+        //        src: mediaAlbumArt + '&resize_w=96&resize_h=96',
+        //        sizes: "96x96",
+        //        type: "image/png",
+        //    },
+        //    {
+        //        src: mediaAlbumArt + '&resize_w=192&resize_h=192',
+        //        sizes: "192x192",
+        //        type: "image/png",
+        //    },
+            {
+                src: closestPost.querySelector('img').src,
+            }, ],
+        });
+
+
+        const totalAids = document.querySelectorAll('[data-aid]').length;
+        let nextAid = Math.floor(audioElem.getAttribute('aid')) + 1;
+        let prevAid = Math.floor(audioElem.getAttribute('aid')) - 1;
+        if (nextAid > totalAids - 1)
+        {
+            nextAid = 0;
+        }
+        if (prevAid < 0)
+        {
+            prevAid = totalAids - 1;
+        }
+
+        navigator.mediaSession.setActionHandler("play", () =>
+        {
+            caudio.play();
+        });
+        navigator.mediaSession.setActionHandler("pause", () =>
+        {
+            caudio.pause();
+        });
+        // navigator.mediaSession.setActionHandler("seekto", (details) => {
+        //     console.log(details);
+        //  if (details.fastSeek && caudio) {
+        // const newTime = details.seekTime || 0;
+        // caudio.currentTime = newTime;
+        //  } else if (caudio) {
+        // const currentTime = caudio.currentTime || 0;
+        //  const seekTime = details.seekTime || 0;
+        //  caudio.currentTime = currentTime + seekTime;
+        //  }
+        //});
+
+
+        navigator.mediaSession.setActionHandler(
+            'nexttrack',
+            () =>
+            {
+                changePlayback(document.querySelector("[aid=\"" + nextAid + "\"]"));
+            }
+        );
+        navigator.mediaSession.setActionHandler(
+            'previoustrack',
+            () =>
+            {
+                changePlayback(document.querySelector("[aid=\"" + prevAid + "\"]"));
+            }
+        );
+        navigator.mediaSession.setActionHandler('seekbackward', (details) =>
+        {
+            caudio.currentTime = caudio.currentTime - (details.seekOffset || 10);
+            updatePositionState();
+        });
+        navigator.mediaSession.setActionHandler('seekforward', (details) =>
+        {
+            caudio.currentTime = caudio.currentTime + (details.seekOffset || 10);
+            updatePositionState();
+        });
 
     }
 
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const iconImage = new Image();
-    iconImage.src = 'apple-touch-icon.png';
 
-    iconImage.onload = function ()
-    {
-        const x = (canvas.width - iconImage.width) / 2;
-        const y = (canvas.height - iconImage.height) / 2;
+});
 
-        ctx.drawImage(iconImage, x, y);
 
-        const imageDataURL = canvas.toDataURL('image/png');
+const deviceWidth = screen.width;
+const deviceHeight = screen.height;
+const pixelRatio = window.devicePixelRatio || 1;
 
-        const appleTouchStartupImageLink = document.createElement('link');
-        appleTouchStartupImageLink.setAttribute('rel', 'apple-touch-startup-image');
-        appleTouchStartupImageLink.setAttribute('href', imageDataURL);
-        document.head.appendChild(appleTouchStartupImageLink);
-    };
-  </script>
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+
+canvas.width = deviceWidth * pixelRatio;
+canvas.height = deviceHeight * pixelRatio;
+
+ctx.fillStyle = 'white';
+if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+{
+    ctx.fillStyle = 'black';
+
+}
+
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+const iconImage = new Image();
+iconImage.src = 'apple-touch-icon.png';
+
+iconImage.onload = function ()
+{
+    const x = (canvas.width - iconImage.width) / 2;
+    const y = (canvas.height - iconImage.height) / 2;
+
+    ctx.drawImage(iconImage, x, y);
+
+    const imageDataURL = canvas.toDataURL('image/png');
+
+    const appleTouchStartupImageLink = document.createElement('link');
+    appleTouchStartupImageLink.setAttribute('rel', 'apple-touch-startup-image');
+    appleTouchStartupImageLink.setAttribute('href', imageDataURL);
+    document.head.appendChild(appleTouchStartupImageLink);
+};
+        
+</script>
 </body>
 </html>
