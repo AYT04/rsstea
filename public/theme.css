@@ -286,7 +286,7 @@ input[type="range"]::-moz-range-thumb {
 span#seekbar:after {
 content: " ";
     display: block;
-    background: #fc7e11;
+    background: #d61feb;
     background:var(--orange);
 
     width: 12px;
