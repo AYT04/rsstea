@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Podcast Search</title>
+  <style>
+    /* --- Global Styles --- */
+    :root {
+      --primary-color: #6c5ce7;
+      --primary-hover: #5b4bc4;
+      --bg-color: #f4f7f6;
+      --card-bg: #ffffff;
+      --text-color: #2d3436;
+      --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      --shadow-hover: 0 10px 15px rgba(0, 0, 0, 0.15);
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    h1 {
+      margin-bottom: 30px;
+      color: var(--primary-color);
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    /* --- Search Container --- */
+    .search-container {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      max-width: 600px;
+      margin-bottom: 40px;
+      background: var(--card-bg);
+      padding: 10px;
+      border-radius: 50px;
+      box-shadow: var(--shadow);
+    }
+
+    input[type="text"] {
+      flex: 1;
+      border: none;
+      outline: none;
+      padding: 12px 20px;
+      font-size: 16px;
+      border-radius: 50px;
+      background: transparent;
+    }
+
+    input[type="text"]:focus {
+      background: #fafafa;
+    }
+
+    button {
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 4px rgba(108, 92, 231, 0.3);
+    }
+
+    button:hover {
+      background-color: var(--primary-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(108, 92, 231, 0.4);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    /* --- Results Grid --- */
+    #results {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      width: 100%;
+      max-width: 1200px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 25px;
+    }
+
+    /* --- Podcast Card Styling --- */
+    #results li {
+      background: var(--card-bg);
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    #results li:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    #results li img {
+      width: 100px;
+      height: 100px;
+      border-radius: 15px;
+      object-fit: cover;
+      margin-bottom: 15px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    #results li h3 {
+      font-size: 1.1rem;
+      margin: 0 0 15px 0;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2; /* Limit to 2 lines */
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      height: 3.2em; /* Fixed height for alignment */
+    }
+
+    #results li a {
+      margin-top: auto; /* Pushes link to bottom */
+      text-decoration: none;
+      color: var(--primary-color);
+      font-weight: 600;
+      padding: 8px 16px;
+      border: 2px solid var(--primary-color);
+      border-radius: 20px;
+      transition: all 0.2s ease;
+      font-size: 0.9rem;
+    }
+
+    #results li a:hover {
+      background-color: var(--primary-color);
+      color: white;
+    }
+
+    /* Empty state message */
+    .no-results {
+      grid-column: 1 / -1;
+      text-align: center;
+      color: #888;
+      font-size: 1.2rem;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🎙️ Podcast Search</h1>
+  
+  <div class="search-container">
+    <input type="text" id="keywordInput" placeholder="Search for podcasts (e.g., 'Tech', 'History')...">
+    <button id="searchButton">Search</button>
+  </div>
+
+  <ol id="results"></ol>
+
+  <script>
+    async function searchPodcasts(keyword) {
+      const searchUrl = `https://itunes.apple.com/search?media=podcast&term=${encodeURIComponent(keyword)}&limit=12`;
+
+      try {
+        const response = await fetch(searchUrl);
+        const data = await response.json();
+        return data.results.map(podcast => ({
+          feedUrl: podcast.feedUrl,
+          title: podcast.collectionName,
+          image: podcast.artworkUrl100
+        }));
+      } catch (error) {
+        console.error('Error searching podcasts:', error);
+        return [];
+      }
+    }
+
+    document.getElementById('searchButton').addEventListener('click', async function() {
+      const input = document.getElementById('keywordInput');
+      const keyword = input.value;
+      const resultsContainer = document.getElementById('results');
+      
+      resultsContainer.innerHTML = '<li class="no-results">Searching...</li>';
+
+      if (keyword.trim() === '') {
+        resultsContainer.innerHTML = '';
+        return;
+      }
+
+      const podcasts = await searchPodcasts(keyword);
+      resultsContainer.innerHTML = '';
+
+      if (podcasts.length === 0) {
+        resultsContainer.innerHTML = '<li class="no-results">No podcasts found. Try a different keyword.</li>';
+        return;
+      }
+
+      podcasts.forEach(podcast => {
+        const listItem = document.createElement('li');
+        
+        const imageElement = document.createElement('img');
+        imageElement.src = podcast.image;
+        imageElement.alt = podcast.title;
+        imageElement.loading = "lazy"; // Performance improvement
+
+        const titleElement = document.createElement('h3');
+        titleElement.textContent = podcast.title;
+        titleElement.title = podcast.title; // Tooltip for long titles
+
+        const feedLink = document.createElement('a');
+        feedLink.href = podcast.feedUrl;
+        feedLink.textContent = 'Listen Now';
+        feedLink.target = "_blank"; // Open in new tab
+
+        listItem.appendChild(imageElement);
+        listItem.appendChild(titleElement);
+        listItem.appendChild(feedLink);
+        resultsContainer.appendChild(listItem);
+      });
+    });
+
+    // Allow pressing "Enter" to search
+    document.getElementById('keywordInput').addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') {
+        document.getElementById('searchButton').click();
+      }
+    });
+  </script>
+</body>
+</html>
