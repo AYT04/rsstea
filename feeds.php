@@ -5,7 +5,7 @@ $result = '';
 $feeda = array();
 $feedn = 0;
 foreach ($urls as $url) {
-echo "\n"."Getting feed from: ". $url." \n";
+    echo "\n"."Getting feed from: ". $url." \n";
     $ch = curl_init();
     curl_setopt_array($ch, [
         CURLOPT_URL => $url,
@@ -26,7 +26,6 @@ echo "\n"."Getting feed from: ". $url." \n";
     }
     curl_close($ch);
 
-
     $response = str_ireplace(array("media:thumbnail",'<media:group>','</media:group>'), array("thumbnail",'',''), $response);
     $feed = simplexml_load_string($response);
     if ($feed) {
@@ -37,27 +36,24 @@ echo "\n"."Getting feed from: ". $url." \n";
                 if ($count >= $postLimit) {
                     break;
                 }
-                $description = $item->description;
+                $description = (string)$item->description;
                 $image = null;
-               if (isset($item->image) && isset($item->image->url)) {
-                    $image = $item->image->url;
-                         
+                if (isset($item->image) && isset($item->image->url)) {
+                    $image = (string)$item->image->url;
                 } else if (isset($item->thumbnail) && isset($item->thumbnail->attributes()['url'])) {
                     $image = (string)$item->thumbnail->attributes()['url'];
-         
                 } else {   
                     preg_match('/<img.+src=[\'"](?P<src>.+?)[\'"].*>/i', $description, $imagematch);
                     if ($imagematch && isset($imagematch['src'])) {
                         $image = $imagematch['src'];
                     } else if (isset($feed->channel->image) && isset($feed->channel->image->url)) {
-                        $image = $feed->channel->image->url;
+                        $image = (string)$feed->channel->image->url;
                     }
-                      
                 }
                                  
                 $audiourl = null;
                 if (isset($item->enclosure) && isset($item->enclosure['url']) && isset($item->enclosure['type']) && strpos($item->enclosure['type'], 'audio/mpeg') !== false) {
-                 $audiourl = $item->enclosure['url'];
+                    $audiourl = (string)$item->enclosure['url'];
                 }
 
                 $feeda[$feedn]['link'] = (string) $item->link;
@@ -75,20 +71,19 @@ echo "\n"."Getting feed from: ". $url." \n";
                 if ($count >= $postLimit) {
                     break;
                 }
-                $content = $entry->content;
+                $content = (string)$entry->content;
                 $image = null;
                 if (isset($entry->image) && isset($entry->image->url)) {
-                 $image = $entry->image->url;
+                    $image = (string)$entry->image->url;
                 } elseif (isset($entry->{'thumbnail'}) && isset($entry->{'thumbnail'}->attributes()['url'])) {
-                $image = (string) $entry->{'thumbnail'}->attributes()['url'];
+                    $image = (string) $entry->{'thumbnail'}->attributes()['url'];
                 } else {
-                 $content = $entry->content;
-                 preg_match('/<img.+src=[\'"](?P<src>.+?)[\'"].*>/i', $content, $imagematch);
-                 $image = ($imagematch && isset($imagematch['src'])) ? $imagematch['src'] : (isset($feed->image) && isset($feed->image->url) ? $feed->image->url : null);
-                 }
+                    preg_match('/<img.+src=[\'"](?P<src>.+?)[\'"].*>/i', $content, $imagematch);
+                    $image = ($imagematch && isset($imagematch['src'])) ? $imagematch['src'] : (isset($feed->image) && isset($feed->image->url) ? (string)$feed->image->url : null);
+                }
                 $audiourl = null;
                 if (isset($entry->link) && isset($entry->link['rel']) && $entry->link['rel'] == 'enclosure' && isset($entry->link['href']) && isset($entry->link['type']) && strpos($entry->link['type'], 'audio/mpeg') !== false) {
-                    $audiourl = $entry->link['href'];
+                    $audiourl = (string)$entry->link['href'];
                 }
 
                 $feeda[$feedn]['link'] = (string) $entry->link['href'];
@@ -97,13 +92,10 @@ echo "\n"."Getting feed from: ". $url." \n";
                 $feeda[$feedn]['date'] = strtotime((string) ($entry->published ?? $entry->updated));
                 $feeda[$feedn]['image'] = (string) $image;
                 $feeda[$feedn]['audio'] = (string) $audiourl;
-            
 
                 $count++; $feedn++;
             }
         }
-     
-     
     } else {
          echo 'Failed to parse feed from ' . $url;
          $feedn++;
@@ -114,41 +106,56 @@ $outhtml = '';
 $outoptions = '<option value="All">All Channels</option>';
 $outchannels = array();
 $index = 0;
+
 foreach($feeda as $post) {
-if(!in_array($post['ch'],$outchannels)) {
-$outoptions .= '<option value="'.$post['ch'].'">'.$post['ch'].'</option>';
-$outchannels[] = $post['ch'];
+    if(!in_array($post['ch'], $outchannels)) {
+        $outoptions .= '<option value="'.htmlspecialchars($post['ch']).'">'.htmlspecialchars($post['ch']).'</option>';
+        $outchannels[] = $post['ch'];
+    }
+    $isaudio = !empty($post['audio']) ? 1 : 0;
+
+    $chInitial = strtoupper(substr($post['ch'], 0, 1));
+    $domain = parse_url($post['link'], PHP_URL_HOST);
+    $imgSrc = !empty($post['image']) ? $post['image'] : 'https://s2.googleusercontent.com/s2/favicons?domain='.urlencode($domain);
+
+    $outhtml .= '<div class="post video-card" data-channel="'.htmlspecialchars($post['ch']).'" data-ts="'.$post['date'].'" data-audio="'.$isaudio.'">';
+    $outhtml .= '  <div class="thumbnail-wrapper">';
+    $outhtml .= '    <a href="'.htmlspecialchars($post['link']).'" target="_blank" class="thumbnail-link">';
+    $outhtml .= '      <img src="'.htmlspecialchars($imgSrc).'" alt="'.htmlspecialchars($post['title']).'" class="thumbnail-img" />';
+    if ($isaudio) {
+        $outhtml .= '      <span class="badge podcast-badge">PODCAST</span>';
+    } else {
+        $outhtml .= '      <span class="badge post-badge">POST</span>';
+    }
+    $outhtml .= '    </a>';
+
+    if($isaudio){
+        $outhtml .= '    <div class="audio">';
+        $outhtml .= '      <button class="audio-play-btn" data-aid="'.$index.'" title="Play Audio">';
+        $outhtml .= '        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+        $outhtml .= '        <span>Play</span>';
+        $outhtml .= '      </button>';
+        $outhtml .= '      <audio src="'.htmlspecialchars($post['audio']).'" preload="metadata" aid="'.$index.'"></audio>';
+        $outhtml .= '    </div>';
+        $index++;
+    }
+
+    $outhtml .= '  </div>'; // end thumbnail-wrapper
+
+    $outhtml .= '  <div class="card-details">';
+    $outhtml .= '    <div class="channel-avatar"><span>'.$chInitial.'</span></div>';
+    $outhtml .= '    <div class="card-meta">';
+    $outhtml .= '      <h2 class="video-title"><a href="'.htmlspecialchars($post['link']).'" target="_blank">'.htmlspecialchars($post['title']).'</a></h2>';
+    $outhtml .= '      <div class="feedname"><span class="channel channel-name">'.htmlspecialchars($post['ch']).'</span></div>';
+    $outhtml .= '      <div class="video-info-line"><span class="date">'.date('M d, Y', $post['date']).'</span></div>';
+    $outhtml .= '    </div>';
+    $outhtml .= '  </div>'; // end card-details
+    $outhtml .= '</div>'; // end post
 }
-$isaudio = !empty($post['audio']) ? 1 : 0;
-$outhtml .= '<div class="post" data-channel="'.$post['ch'].'" data-ts="'.$post['date'].'" data-audio="'.$isaudio.'">';
-if(!empty($post['image'])){
-$outhtml .= '<div class="leftpan"><img src="'.$post['image'].'" alt="'.$post['title'].'"/ ></div>';
-}
-else {
-  $domain = parse_url($post['link'], PHP_URL_HOST);
-  $outhtml .= '<div class="leftpan"><img src="https://s2.googleusercontent.com/s2/favicons?domain='.urlencode($domain).'" alt="'.$post['title'].'"/><span class="domain">'.$domain.'</span></div>';
-}
-$outhtml .= '<div class="rightpan"><div class="feedname"><span class="channel">'.$post['ch'].'</span> &bull; <span class="date">'.date('M d, Y',$post['date']).'</span></div>
-<h2><a href="'.$post['link'].'" target="_blank">'.$post['title'].'</a></h2>';
-if(!empty($post['audio'])){
-$outhtml .= '<div class="audio">
-<button data-aid="'.$index.'">Play</button>
-<audio src="'.$post['audio'].'" preload="metadata" aid="'.$index.'"  controls></audio></div>';
-$index++;
-}
 
-
-
-
-
-$outhtml .='
-</div></div>
-';}
 file_put_contents('feed.json', json_encode($feeda));
+file_put_contents('public/feed.json', json_encode($feeda));
 $template = file_get_contents('base.html');
-$html = str_replace(array('<!-- posts here -->','<!-- options here -->'),array($outhtml,$outoptions),$template);
+$html = str_replace(array('<!-- posts here -->','<!-- options here -->'), array($outhtml, $outoptions), $template);
 file_put_contents('public/index.html', $html);
-
-
-
 ?>
