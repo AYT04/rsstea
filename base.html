@@ -38,7 +38,7 @@
         <button class="icon-btn" aria-label="Create">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4zM14 13h-3v3H9v-3H6v-2h3V8h2v3h3v2z"/></svg>
         </button>
-        <button class="icon-btn" aria-label="Notifications">
+        <button class="icon-btn" id="notification-bell-btn" aria-label="Notifications" title="Toggle Push Notifications">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
         </button>
         <div class="user-avatar">A</div>
@@ -244,7 +244,159 @@ if (searchInput) {
     searchInput.addEventListener('input', filterPosts);
 }
 
+// Notification System (Browser-based)
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(err => {
+        console.warn('Service Worker registration failed:', err);
+    });
+}
+
+function updateNotificationUI() {
+    const bellBtn = document.getElementById('notification-bell-btn');
+    if (!bellBtn) return;
+    const isGranted = window.Notification && Notification.permission === 'granted';
+    const isEnabled = localStorage.getItem('rssTea_notifications_enabled') === 'true';
+
+    if (isGranted && isEnabled) {
+        bellBtn.classList.add('notifications-active');
+        bellBtn.style.color = '#ff4b2b';
+        bellBtn.setAttribute('title', 'Notifications Enabled (Click to Disable)');
+    } else {
+        bellBtn.classList.remove('notifications-active');
+        bellBtn.style.color = '';
+        bellBtn.setAttribute('title', isGranted ? 'Notifications Disabled (Click to Enable)' : 'Enable Push Notifications');
+    }
+}
+
+function showWebNotification(item) {
+    const title = item.ch ? `${item.ch}: ${item.title}` : item.title;
+    const options = {
+        body: item.title,
+        icon: item.image || 'apple-touch-icon.png',
+        badge: 'favicon.png',
+        data: { url: item.link },
+        tag: item.link
+    };
+
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then(registration => {
+            registration.showNotification(title, options);
+        }).catch(() => {
+            if ('Notification' in window) {
+                const notif = new Notification(title, options);
+                notif.onclick = function() {
+                    window.open(item.link, '_blank');
+                };
+            }
+        });
+    } else if ('Notification' in window && Notification.permission === 'granted') {
+        const notif = new Notification(title, options);
+        notif.onclick = function() {
+            window.open(item.link, '_blank');
+        };
+    }
+}
+
+function checkForNewPostsAndNotify(isInitialToggle = false) {
+    if (!('Notification' in window)) return;
+    const isGranted = Notification.permission === 'granted';
+    const isEnabled = localStorage.getItem('rssTea_notifications_enabled') === 'true';
+
+    if (!isGranted || !isEnabled) return;
+
+    let seenPosts = [];
+    try {
+        seenPosts = JSON.parse(localStorage.getItem('rssTea_seen_posts') || '[]');
+    } catch (e) {
+        seenPosts = [];
+    }
+
+    const posts = Array.from(document.querySelectorAll('.post')).map(postElem => {
+        const linkElem = postElem.querySelector('.video-title a') || postElem.querySelector('.thumbnail-link');
+        const imgElem = postElem.querySelector('.thumbnail-img');
+        const channel = postElem.getAttribute('data-channel') || '';
+        const title = linkElem ? linkElem.textContent.trim() : '';
+        const link = linkElem ? linkElem.getAttribute('href') : '';
+        const image = imgElem ? imgElem.getAttribute('src') : '';
+        return { channel, title, link, image };
+    }).filter(item => item.link && item.title);
+
+    if (seenPosts.length === 0) {
+        const currentLinks = posts.map(p => p.link);
+        localStorage.setItem('rssTea_seen_posts', JSON.stringify(currentLinks));
+        if (isInitialToggle) {
+            showWebNotification({
+                ch: 'rssTea',
+                title: 'Web Push Notifications Enabled!',
+                link: location.href,
+                image: 'apple-touch-icon.png'
+            });
+        }
+        return;
+    }
+
+    const newPosts = posts.filter(p => !seenPosts.includes(p.link));
+
+    if (newPosts.length > 0) {
+        newPosts.forEach(post => {
+            showWebNotification({
+                ch: post.channel,
+                title: post.title,
+                link: post.link,
+                image: post.image
+            });
+            if (!seenPosts.includes(post.link)) {
+                seenPosts.push(post.link);
+            }
+        });
+        localStorage.setItem('rssTea_seen_posts', JSON.stringify(seenPosts));
+    }
+}
+
+function initNotificationBtn() {
+    const bellBtn = document.getElementById('notification-bell-btn');
+    if (!bellBtn) return;
+
+    updateNotificationUI();
+
+    bellBtn.addEventListener('click', function() {
+        if (!('Notification' in window)) {
+            alert('Browser notifications are not supported in your browser.');
+            return;
+        }
+
+        if (Notification.permission === 'denied') {
+            alert('Notifications are blocked in your browser settings. Please allow notifications for this site to receive updates.');
+            return;
+        }
+
+        if (Notification.permission === 'default') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    localStorage.setItem('rssTea_notifications_enabled', 'true');
+                    updateNotificationUI();
+                    checkForNewPostsAndNotify(true);
+                } else {
+                    localStorage.setItem('rssTea_notifications_enabled', 'false');
+                    updateNotificationUI();
+                }
+            });
+        } else if (Notification.permission === 'granted') {
+            const isCurrentlyEnabled = localStorage.getItem('rssTea_notifications_enabled') === 'true';
+            const newState = !isCurrentlyEnabled;
+            localStorage.setItem('rssTea_notifications_enabled', newState.toString());
+            updateNotificationUI();
+            if (newState) {
+                checkForNewPostsAndNotify(true);
+            }
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function () {
+    initNotificationBtn();
+    checkForNewPostsAndNotify(false);
+
     const btns = document.querySelectorAll('.audio-play-btn, .audio button[data-aid]');
     let caudio = null;
     let ppBtn = null;
