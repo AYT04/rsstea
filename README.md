@@ -4,4 +4,4 @@ rssTea is a lightweight web application that allows you to read RSS feeds and li
 
 ![Screenshot](public/image.png)
 
-Credit to the awesome developer who originally developed `rssTea`! - https://github.com/avadhesh18
+Credit: [Awesome Dev](https://github.com/avadhesh18)!
