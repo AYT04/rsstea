@@ -1,6 +1,6 @@
 {
   "short_name": "rssTea",
-  "name": "rssTea Rss Reader",
+  "name": "Really Standard, Simple: Algorithm",
   "icons": [
     {
       "src": "apple-touch-icon.png",
@@ -19,6 +19,6 @@
   "display": "standalone",
   "theme_color": "#000000",
   "background_color": "#000000",
-  "description": "rssTea is a RSS reader and Podcast web app that utilises Github Actions to fetch feeds and display them.",
-  "categories": ["social", "news"]
+  "description": "rssTea is a web based RSS reader that aims to give you a chance at owning your algorithm.",
+  "categories": ["gaming", "technology", "linux", "privacy", "someordinarygamers", "brodie robertson", "techlore"]
 }
