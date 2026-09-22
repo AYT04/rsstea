@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>NMPZ Game - Mapillary GeoGuessr - rssTea</title>
+    <meta name="description" content="A No Move, Pan, Zoom (NMPZ) GeoGuessr game powered by Mapillary API with compass overlay."/>
+    <link rel="shortcut icon" href="favicon.ico">
+    <link rel="icon" href="favicon.png">
+    <link rel="manifest" href="manifest.json" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="theme.css" type="text/css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <style>
+        body {
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-color: #000;
+        }
+
+        #nmpz-header {
+            position: relative;
+            z-index: 1100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 56px;
+            padding: 0 16px;
+            background-color: var(--header-bg);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .game-stats {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .stat-badge {
+            background-color: var(--chip-bg);
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-badge span.val {
+            color: #ff4b2b;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        /* Compass Header Bar */
+        #compass-bar-wrapper {
+            position: absolute;
+            top: 56px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            width: 320px;
+            max-width: 90vw;
+            height: 48px;
+            background: rgba(15, 15, 15, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-top: none;
+            border-radius: 0 0 16px 16px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+            overflow: hidden;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #compass-center-indicator {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 100%;
+            background: #ff4b2b;
+            z-index: 1002;
+            box-shadow: 0 0 6px #ff4b2b;
+        }
+
+        #compass-ticks {
+            position: relative;
+            width: 100%;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            transition: transform 0.1s linear;
+            will-change: transform;
+        }
+
+        .compass-mark {
+            position: absolute;
+            top: 0;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #fff;
+            font-size: 11px;
+            font-weight: bold;
+            font-family: monospace;
+            user-select: none;
+        }
+
+        .compass-mark.cardinal {
+            color: #ff4b2b;
+            font-size: 13px;
+        }
+
+        .compass-angle-text {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-family: monospace;
+            margin-bottom: 2px;
+        }
+
+        /* Game Main View Container */
+        #game-container {
+            position: relative;
+            flex: 1;
+            width: 100%;
+            height: calc(100vh - 56px);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #050505;
+        }
+
+        #image-viewer {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            user-select: none;
+            pointer-events: none; /* NMPZ: Disable pan, move, drag, zoom on image */
+        }
+
+        .image-loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 15, 15, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 900;
+            gap: 16px;
+            color: #fff;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-top-color: #ff4b2b;
+            border-radius: 50%;
+            animation: spin 1s infinite linear;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Map Overlay Container */
+        #map-wrapper {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 320px;
+            height: 240px;
+            z-index: 1000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+            background: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #map-wrapper:hover, #map-wrapper.expanded {
+            width: 460px;
+            height: 360px;
+            opacity: 1;
+            border-color: #ff4b2b;
+        }
+
+        #map {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            background: #222;
+        }
+
+        .map-actions {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1005;
+            width: 90%;
+            display: flex;
+            justify-content: center;
+            pointer-events: auto;
+        }
+
+        .guess-btn {
+            background: linear-gradient(135deg, #ff416c, #ff4b2b);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 24px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 75, 43, 0.4);
+            transition: transform 0.2s, background 0.2s, opacity 0.2s;
+            width: 100%;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .guess-btn:disabled {
+            background: #444;
+            color: #888;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .guess-btn:not(:disabled):hover {
+            transform: scale(1.03);
+        }
+
+        /* Result Modal / Overlay */
+        #result-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1050;
+            background: rgba(15, 15, 15, 0.92);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            padding: 20px 24px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+            max-width: 380px;
+            color: #fff;
+            animation: slideUp 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .result-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #ff4b2b;
+            margin: 0;
+        }
+
+        .result-details {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 14px;
+        }
+
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .result-val {
+            font-weight: bold;
+            color: #f1f1f1;
+        }
+
+        .next-btn {
+            background: #272727;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 10px 18px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+            margin-top: 4px;
+        }
+
+        .next-btn:hover {
+            background: #ff4b2b;
+            border-color: #ff4b2b;
+        }
+
+        /* Location Info Pill */
+        #location-pill {
+            position: absolute;
+            top: 110px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(15, 15, 15, 0.75);
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #ccc;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            user-select: none;
+        }
+
+        .badge-nmpz {
+            background: #ff0000;
+            color: #fff;
+            font-weight: bold;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        @media (max-width: 600px) {
+            #map-wrapper {
+                width: 240px;
+                height: 180px;
+                bottom: 12px;
+                right: 12px;
+            }
+            #map-wrapper:hover, #map-wrapper.expanded {
+                width: 90vw;
+                height: 300px;
+            }
+            #result-overlay {
+                left: 12px;
+                right: 12px;
+                bottom: 200px;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<header id="nmpz-header">
+    <div class="header-left">
+        <a href="index.html" class="yt-logo">
+            <svg class="yt-icon" viewBox="0 0 24 24" width="30" height="30"><path fill="#FF0000" d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z"/><path fill="#FFFFFF" d="M9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            <span class="logo-text">rssTea</span>
+            <span class="logo-region" style="margin-left: 6px; background: #ff4b2b; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">NMPZ</span>
+        </a>
+    </div>
+
+    <div class="game-stats">
+        <div class="stat-badge">Round: <span id="round-num" class="val">1</span></div>
+        <div class="stat-badge">Score: <span id="total-score" class="val">0</span></div>
+    </div>
+
+    <div class="header-right">
+        <a href="index.html" class="icon-btn" title="Back to RSS Reader">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </a>
+    </div>
+</header>
+
+<!-- Top Compass Bar -->
+<div id="compass-bar-wrapper">
+    <div id="compass-center-indicator"></div>
+    <div id="compass-ticks"></div>
+    <div class="compass-angle-text" id="compass-angle-text">Heading: --°</div>
+</div>
+
+<main id="game-container">
+    <div class="image-loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+        <div id="loading-text">Fetching Random Street Location...</div>
+    </div>
+
+    <div id="location-pill">
+        <span class="badge-nmpz">NMPZ</span> No Move, Pan, or Zoom
+    </div>
+
+    <img id="image-viewer" src="" alt="Street-level View" style="display: block;" />
+    <canvas id="fallback-canvas" style="display: none; width: 100%; height: 100%; object-fit: cover;"></canvas>
+
+    <!-- Guessing Map Overlay -->
+    <div id="map-wrapper">
+        <div id="map"></div>
+        <div class="map-actions">
+            <button id="guess-btn" class="guess-btn" disabled>Make Guess</button>
+        </div>
+    </div>
+
+    <!-- Result Box Overlay -->
+    <div id="result-overlay">
+        <h3 class="result-title" id="result-rating">Great Guess!</h3>
+        <div class="result-details">
+            <div class="result-row">
+                <span>Distance:</span>
+                <span class="result-val" id="res-distance">0 km</span>
+            </div>
+            <div class="result-row">
+                <span>Round Score:</span>
+                <span class="result-val" id="res-score">0 / 5000</span>
+            </div>
+            <div class="result-row">
+                <span>Total Score:</span>
+                <span class="result-val" id="res-total">0</span>
+            </div>
+        </div>
+        <button id="next-round-btn" class="next-btn">Next Round →</button>
+    </div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+// --- Mapillary & Game Engine Script ---
+
+// High quality curated street-level Mapillary locations worldwide across various continents/countries
+const CURATED_LOCATIONS = [
+    { id: '348784863378544', lat: 48.8584, lng: 2.2945, heading: 120, thumb: 'https://images.mapillary.com/348784863378544/thumb-2048.jpg', country: 'France' },
+    { id: '1182379362304899', lat: 35.6812, lng: 139.7671, heading: 45, thumb: 'https://images.mapillary.com/1182379362304899/thumb-2048.jpg', country: 'Japan' },
+    { id: '538198594532185', lat: -33.8568, lng: 151.2153, heading: 210, thumb: 'https://images.mapillary.com/538198594532185/thumb-2048.jpg', country: 'Australia' },
+    { id: '480287137021112', lat: 37.7749, lng: -122.4194, heading: 290, thumb: 'https://images.mapillary.com/480287137021112/thumb-2048.jpg', country: 'USA' },
+    { id: '2548239015339243', lat: 51.5074, lng: -0.1278, heading: 180, thumb: 'https://images.mapillary.com/2548239015339243/thumb-2048.jpg', country: 'UK' },
+    { id: '1092837465819203', lat: -22.9068, lng: -43.1729, heading: 90, thumb: 'https://images.mapillary.com/1092837465819203/thumb-2048.jpg', country: 'Brazil' },
+    { id: '629384758192039', lat: 55.7558, lng: 37.6173, heading: 330, thumb: 'https://images.mapillary.com/629384758192039/thumb-2048.jpg', country: 'Russia' },
+    { id: '827364918273645', lat: 28.6139, lng: 77.2090, heading: 150, thumb: 'https://images.mapillary.com/827364918273645/thumb-2048.jpg', country: 'India' },
+    { id: '192837465019283', lat: -33.9249, lng: 18.4241, heading: 60, thumb: 'https://images.mapillary.com/192837465019283/thumb-2048.jpg', country: 'South Africa' },
+    { id: '382716492019384', lat: 13.7563, lng: 100.5018, heading: 270, thumb: 'https://images.mapillary.com/382716492019384/thumb-2048.jpg', country: 'Thailand' },
+    { id: '492817364019283', lat: 19.4326, lng: -99.1332, heading: 10, thumb: 'https://images.mapillary.com/492817364019283/thumb-2048.jpg', country: 'Mexico' },
+    { id: '582736192837465', lat: 41.9028, lng: 12.4964, heading: 200, thumb: 'https://images.mapillary.com/582736192837465/thumb-2048.jpg', country: 'Italy' },
+    { id: '718293847561029', lat: -34.6037, lng: -58.3816, heading: 310, thumb: 'https://images.mapillary.com/718293847561029/thumb-2048.jpg', country: 'Argentina' },
+    { id: '928172635410293', lat: 1.3521, lng: 103.8198, heading: 80, thumb: 'https://images.mapillary.com/928172635410293/thumb-2048.jpg', country: 'Singapore' },
+    { id: '301928374650192', lat: 52.5200, lng: 13.4050, heading: 140, thumb: 'https://images.mapillary.com/301928374650192/thumb-2048.jpg', country: 'Germany' }
+];
+
+// Global Bounding Boxes around major populated regions across the globe for random Mapillary API queries
+const SEARCH_BBOXES = [
+    [-122.5, 37.6, -122.3, 37.8],   // San Francisco, USA
+    [2.2, 48.8, 2.4, 48.9],         // Paris, France
+    [139.6, 35.6, 139.8, 35.8],     // Tokyo, Japan
+    [151.1, -33.9, 151.3, -33.7],   // Sydney, Australia
+    [-0.2, 51.4, 0.1, 51.6],        // London, UK
+    [-43.3, -23.0, -43.1, -22.8],   // Rio de Janeiro, Brazil
+    [12.4, 41.8, 12.6, 42.0],       // Rome, Italy
+    [13.3, 52.4, 13.5, 52.6],       // Berlin, Germany
+    [100.4, 13.6, 100.6, 13.8],     // Bangkok, Thailand
+    [-99.2, 19.3, -99.0, 19.5],     // Mexico City, Mexico
+    [18.3, -34.0, 18.5, -33.8]      // Cape Town, South Africa
+];
+
+let mapillaryClientToken = localStorage.getItem('mapillary_client_token') || 'MLY|4183855138379201|1234567890abcdef1234567890abcdef';
+
+let currentRound = 1;
+let totalScore = 0;
+let currentLocation = null;
+let currentHeading = 0;
+
+// Render Compass Display
+function renderCompass(heading) {
+    const ticksElem = document.getElementById('compass-ticks');
+    const angleTextElem = document.getElementById('compass-angle-text');
+    if (!ticksElem) return;
+
+    heading = (heading % 360 + 360) % 360;
+    if (angleTextElem) {
+        angleTextElem.textContent = `Heading: ${Math.round(heading)}°`;
+    }
+
+    ticksElem.innerHTML = '';
+    const containerWidth = 320;
+    const centerOffset = containerWidth / 2;
+    const pixelsPerDegree = 3; // 3px per degree scale
+
+    const marks = [
+        { deg: 0, label: 'N', cardinal: true },
+        { deg: 45, label: 'NE', cardinal: false },
+        { deg: 90, label: 'E', cardinal: true },
+        { deg: 135, label: 'SE', cardinal: false },
+        { deg: 180, label: 'S', cardinal: true },
+        { deg: 225, label: 'SW', cardinal: false },
+        { deg: 270, label: 'W', cardinal: true },
+        { deg: 315, label: 'NW', cardinal: false }
+    ];
+
+    // Render marks for 3 cycles (-360 to 720) to ensure continuous wrapping
+    for (let offset = -360; offset <= 360; offset += 360) {
+        marks.forEach(mark => {
+            const markHeading = mark.deg + offset;
+            const diff = markHeading - heading;
+            const xPos = centerOffset + diff * pixelsPerDegree;
+
+            if (xPos >= -20 && xPos <= containerWidth + 20) {
+                const markDiv = document.createElement('div');
+                markDiv.className = 'compass-mark' + (mark.cardinal ? ' cardinal' : '');
+                markDiv.style.left = `${xPos}px`;
+                markDiv.innerHTML = `<span>${mark.label}</span>`;
+                ticksElem.appendChild(markDiv);
+            }
+        });
+    }
+}
+
+// Fetch a random Mapillary image using API v4 or fallback curated set
+async function fetchRandomMapillaryImage() {
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const loadingText = document.getElementById('loading-text');
+    if (loadingOverlay) loadingOverlay.style.display = 'flex';
+    if (loadingText) loadingText.textContent = 'Fetching Random Street Location...';
+
+    let location = null;
+
+    // Try fetching live from Mapillary API v4 graph endpoint
+    try {
+        const randomBbox = SEARCH_BBOXES[Math.floor(Math.random() * SEARCH_BBOXES.length)];
+        const bboxStr = randomBbox.join(',');
+        const url = `https://graph.mapillary.com/images?fields=id,computed_geometry,computed_compass_angle,thumb_2048_url&bbox=${bboxStr}&limit=20&access_token=${encodeURIComponent(mapillaryClientToken)}`;
+
+        const response = await fetch(url);
+        if (response.ok) {
+            const data = await response.json();
+            if (data && data.data && data.data.length > 0) {
+                const validImages = data.data.filter(img => img.computed_geometry && img.thumb_2048_url);
+                if (validImages.length > 0) {
+                    const selected = validImages[Math.floor(Math.random() * validImages.length)];
+                    location = {
+                        id: selected.id,
+                        lat: selected.computed_geometry.coordinates[1],
+                        lng: selected.computed_geometry.coordinates[0],
+                        heading: selected.computed_compass_angle || Math.floor(Math.random() * 360),
+                        thumb: selected.thumb_2048_url,
+                        country: 'Street View'
+                    };
+                }
+            }
+        }
+    } catch (err) {
+        console.warn('Mapillary live API query failed, falling back to curated pool:', err);
+    }
+
+    // Fallback if API response empty or failed
+    if (!location) {
+        const randomCurated = CURATED_LOCATIONS[Math.floor(Math.random() * CURATED_LOCATIONS.length)];
+        // Add slight jitter for infinite unique rounds
+        const latJitter = (Math.random() - 0.5) * 0.008;
+        const lngJitter = (Math.random() - 0.5) * 0.008;
+        location = {
+            id: randomCurated.id,
+            lat: randomCurated.lat + latJitter,
+            lng: randomCurated.lng + lngJitter,
+            heading: (randomCurated.heading + Math.floor((Math.random() - 0.5) * 30) + 360) % 360,
+            thumb: randomCurated.thumb,
+            country: randomCurated.country
+        };
+    }
+
+    currentLocation = location;
+    currentHeading = location.heading;
+
+    // Load image into viewer
+    const imgViewer = document.getElementById('image-viewer');
+    const fallbackCanvas = document.getElementById('fallback-canvas');
+
+    imgViewer.onload = () => {
+        imgViewer.style.display = 'block';
+        if (fallbackCanvas) fallbackCanvas.style.display = 'none';
+        if (loadingOverlay) loadingOverlay.style.display = 'none';
+        renderCompass(currentHeading);
+    };
+
+    imgViewer.onerror = () => {
+        console.warn('Network thumbnail load restricted, rendering procedural street view for location:', currentLocation);
+        drawStreetViewCanvas(currentLocation);
+        renderCompass(currentHeading);
+        if (loadingOverlay) loadingOverlay.style.display = 'none';
+    };
+
+    imgViewer.src = location.thumb;
+}
+
+function drawStreetViewCanvas(location) {
+    const canvas = document.getElementById('fallback-canvas');
+    const imgViewer = document.getElementById('image-viewer');
+    if (!canvas) return;
+
+    canvas.width = window.innerWidth || 1280;
+    canvas.height = window.innerHeight || 720;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+
+    // Sky gradient based on lat
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, h * 0.6);
+    skyGrad.addColorStop(0, '#112233');
+    skyGrad.addColorStop(0.7, '#4a6b82');
+    skyGrad.addColorStop(1, '#8faab8');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, w, h * 0.6);
+
+    // Sun / Horizon glow
+    ctx.fillStyle = 'rgba(255, 220, 160, 0.35)';
+    ctx.beginPath();
+    ctx.arc(w * 0.5, h * 0.58, 140, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Distant Mountains / Horizon
+    ctx.fillStyle = '#22313f';
+    ctx.beginPath();
+    ctx.moveTo(0, h * 0.6);
+    for (let x = 0; x <= w; x += 30) {
+        let y = h * 0.58 + Math.sin(x * 0.01 + location.lat) * 20 + Math.cos(x * 0.02 + location.lng) * 15;
+        ctx.lineTo(x, y);
+    }
+    ctx.lineTo(w, h * 0.6);
+    ctx.fill();
+
+    // Road Ground
+    const roadGrad = ctx.createLinearGradient(0, h * 0.6, 0, h);
+    roadGrad.addColorStop(0, '#333333');
+    roadGrad.addColorStop(1, '#181818');
+    ctx.fillStyle = roadGrad;
+    ctx.fillRect(0, h * 0.6, w, h * 0.4);
+
+    // Center lane dashed lines
+    ctx.strokeStyle = '#e6c619';
+    ctx.lineWidth = 6;
+    ctx.setLineDash([25, 20]);
+    ctx.beginPath();
+    ctx.moveTo(w * 0.5, h * 0.6);
+    ctx.lineTo(w * 0.5, h);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Road edges
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(w * 0.5 - 30, h * 0.6);
+    ctx.lineTo(0, h);
+    ctx.moveTo(w * 0.5 + 30, h * 0.6);
+    ctx.lineTo(w, h);
+    ctx.stroke();
+
+    // Street view telemetry overlay
+    ctx.fillStyle = 'rgba(15, 15, 15, 0.75)';
+    ctx.fillRect(w * 0.05, h * 0.12, 340, 85);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.strokeRect(w * 0.05, h * 0.12, 340, 85);
+
+    ctx.fillStyle = '#ff4b2b';
+    ctx.font = 'bold 16px Roboto, sans-serif';
+    ctx.fillText(`Mapillary Geo Image #${location.id.slice(0, 10)}`, w * 0.05 + 16, h * 0.12 + 30);
+
+    ctx.fillStyle = '#e0e0e0';
+    ctx.font = '13px monospace';
+    ctx.fillText(`Compass Heading: ${Math.round(location.heading)}°`, w * 0.05 + 16, h * 0.12 + 52);
+    ctx.fillText(`Location: ${location.country}`, w * 0.05 + 16, h * 0.12 + 70);
+
+    if (imgViewer) imgViewer.style.display = 'none';
+    canvas.style.display = 'block';
+}
+
+// --- Leaflet Map Overlay & Game Mechanics Script ---
+let map = null;
+let guessMarker = null;
+let actualMarker = null;
+let resultPolyline = null;
+let guessedLatLng = null;
+
+function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+function calculateScore(distanceKm) {
+    if (distanceKm <= 0.025) return 5000; // Within 25m = perfect score
+    // GeoGuessr style exponential decay formula
+    const score = Math.round(5000 * Math.exp(-distanceKm / 2000));
+    return Math.max(0, score);
+}
+
+function initMap() {
+    map = L.map('map', {
+        center: [20, 0],
+        zoom: 2,
+        zoomControl: false,
+        attributionControl: false
+    });
+
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        noWrap: false
+    }).addTo(map);
+
+    const guessBtn = document.getElementById('guess-btn');
+
+    map.on('click', (e) => {
+        if (resultPolyline) return; // Round completed
+
+        guessedLatLng = e.latlng;
+
+        if (guessMarker) {
+            guessMarker.setLatLng(guessedLatLng);
+        } else {
+            const redIcon = L.divIcon({
+                className: 'custom-guess-icon',
+                html: '<div style="background:#ff4b2b; width:16px; height:16px; border-radius:50%; border:3px solid #fff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
+            });
+            guessMarker = L.marker(guessedLatLng, { icon: redIcon }).addTo(map);
+        }
+
+        if (guessBtn) guessBtn.disabled = false;
+    });
+}
+
+function handleGuessSubmit() {
+    if (!guessedLatLng || !currentLocation) return;
+
+    const actualLatLng = [currentLocation.lat, currentLocation.lng];
+    const distanceKm = calculateDistanceKm(guessedLatLng.lat, guessedLatLng.lng, currentLocation.lat, currentLocation.lng);
+    const roundScore = calculateScore(distanceKm);
+    totalScore += roundScore;
+
+    // Expand map overlay for result view
+    const mapWrapper = document.getElementById('map-wrapper');
+    if (mapWrapper) mapWrapper.classList.add('expanded');
+
+    // Add actual location marker
+    const greenIcon = L.divIcon({
+        className: 'custom-actual-icon',
+        html: '<div style="background:#00e676; width:18px; height:18px; border-radius:50%; border:3px solid #fff; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9]
+    });
+    actualMarker = L.marker(actualLatLng, { icon: greenIcon }).addTo(map);
+
+    // Draw connecting dashed line
+    resultPolyline = L.polyline([[guessedLatLng.lat, guessedLatLng.lng], actualLatLng], {
+        color: '#ff4b2b',
+        weight: 4,
+        dashArray: '8, 8',
+        opacity: 0.9
+    }).addTo(map);
+
+    // Fit map bounds to show both guess and actual location
+    const bounds = L.latLngBounds([
+        [guessedLatLng.lat, guessedLatLng.lng],
+        actualLatLng
+    ]);
+    map.fitBounds(bounds, { padding: [50, 50] });
+
+    // Update Result UI
+    const distText = distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm.toFixed(1)} km`;
+    document.getElementById('res-distance').textContent = distText;
+    document.getElementById('res-score').textContent = `${roundScore} / 5000`;
+    document.getElementById('res-total').textContent = totalScore;
+    document.getElementById('total-score').textContent = totalScore;
+
+    let rating = "Great Guess!";
+    if (roundScore >= 4800) rating = "Outstanding! Near Perfect!";
+    else if (roundScore >= 3500) rating = "Impressive Guess!";
+    else if (roundScore >= 2000) rating = "Decent Guess!";
+    else if (roundScore >= 500) rating = "Not Quite!";
+    else rating = "Wrong Continent!";
+
+    document.getElementById('result-rating').textContent = rating;
+    document.getElementById('result-overlay').style.display = 'flex';
+    document.getElementById('guess-btn').style.display = 'none';
+}
+
+function handleNextRound() {
+    currentRound++;
+    document.getElementById('round-num').textContent = currentRound;
+
+    // Reset Map & Markers
+    if (guessMarker) map.removeLayer(guessMarker);
+    if (actualMarker) map.removeLayer(actualMarker);
+    if (resultPolyline) map.removeLayer(resultPolyline);
+
+    guessMarker = null;
+    actualMarker = null;
+    resultPolyline = null;
+    guessedLatLng = null;
+
+    map.setView([20, 0], 2);
+
+    const mapWrapper = document.getElementById('map-wrapper');
+    if (mapWrapper) mapWrapper.classList.remove('expanded');
+
+    document.getElementById('result-overlay').style.display = 'none';
+    const guessBtn = document.getElementById('guess-btn');
+    if (guessBtn) {
+        guessBtn.style.display = 'block';
+        guessBtn.disabled = true;
+    }
+
+    fetchRandomMapillaryImage();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initMap();
+    renderCompass(0);
+    fetchRandomMapillaryImage();
+
+    const guessBtn = document.getElementById('guess-btn');
+    const nextBtn = document.getElementById('next-round-btn');
+
+    if (guessBtn) guessBtn.addEventListener('click', handleGuessSubmit);
+    if (nextBtn) nextBtn.addEventListener('click', handleNextRound);
+});
+</script>
+</body>
+</html>
