@@ -35,6 +35,19 @@
   </div>
 </div>
 
+<div id="iframe_modal" class="iframe-modal">
+  <div class="iframe-header">
+    <span id="iframe_title">Content</span>
+    <div class="iframe-controls">
+      <a id="iframe_external" href="#" target="_blank" title="Open in new tab">&#8599;</a>
+      <button id="iframe_close" aria-label="Close">&times;</button>
+    </div>
+  </div>
+  <div class="iframe-body">
+    <iframe id="content_iframe" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+  </div>
+</div>
+
 <script>
 const tabs = document.querySelectorAll('.tab');
 const posts = document.querySelectorAll('.post');
@@ -96,6 +109,72 @@ tabs.forEach(tab =>
 
 document.addEventListener('DOMContentLoaded', function ()
 {
+    const iframeModal = document.getElementById('iframe_modal');
+    const contentIframe = document.getElementById('content_iframe');
+    const iframeTitle = document.getElementById('iframe_title');
+    const iframeClose = document.getElementById('iframe_close');
+    const iframeExternal = document.getElementById('iframe_external');
+
+    function getEmbedUrl(url) {
+        try {
+            const parsedUrl = new URL(url);
+            if (parsedUrl.hostname.includes('youtube.com')) {
+                const videoId = parsedUrl.searchParams.get('v');
+                if (videoId) {
+                    return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+                }
+            } else if (parsedUrl.hostname.includes('youtu.be')) {
+                const videoId = parsedUrl.pathname.slice(1);
+                if (videoId) {
+                    return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+                }
+            } else if (parsedUrl.hostname.includes('vimeo.com')) {
+                const videoId = parsedUrl.pathname.split('/')[1];
+                if (videoId) {
+                    return `https://player.vimeo.com/video/${videoId}?autoplay=1`;
+                }
+            }
+        } catch (e) {
+            console.error('Invalid URL:', e);
+        }
+        return url;
+    }
+
+    function openInIframe(url, title) {
+        const embedUrl = getEmbedUrl(url);
+        contentIframe.src = embedUrl;
+        iframeTitle.textContent = title || 'Content';
+        if (iframeExternal) {
+            iframeExternal.href = url;
+        }
+        iframeModal.classList.add('show');
+    }
+
+    function closeIframe() {
+        iframeModal.classList.remove('show');
+        contentIframe.src = 'about:blank';
+    }
+
+    if (iframeClose) {
+        iframeClose.addEventListener('click', closeIframe);
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && iframeModal.classList.contains('show')) {
+            closeIframe();
+        }
+    });
+
+    document.addEventListener('click', function (e) {
+        const link = e.target.closest('.post h2 a');
+        if (link) {
+            e.preventDefault();
+            const url = link.getAttribute('href');
+            const title = link.textContent.trim();
+            openInIframe(url, title);
+        }
+    });
+
     const btns = document.querySelectorAll('.audio button[data-aid]');
     let caudio = null;
     let ppBtn = null;

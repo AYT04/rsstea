@@ -483,3 +483,75 @@ span.tab:hover,select:hover {
     background: var(--lightgrey);
 }
 }
+
+.iframe-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 1000;
+    flex-direction: column;
+}
+
+.iframe-modal.show {
+    display: flex;
+}
+
+.iframe-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background: var(--white);
+    color: var(--black);
+    border-bottom: 1px solid var(--grey);
+}
+
+#iframe_title {
+    font-weight: 600;
+    font-size: 16px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    margin-right: 15px;
+    color: var(--black);
+}
+
+.iframe-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+#iframe_external {
+    color: var(--orange);
+    text-decoration: none;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+#iframe_close {
+    background: transparent;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: var(--black);
+    line-height: 1;
+    padding: 0 5px;
+}
+
+.iframe-body {
+    flex: 1;
+    width: 100%;
+    height: calc(100% - 50px);
+    background: #000;
+}
+
+.iframe-body iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
